@@ -2,6 +2,9 @@ import scipy.io as sio
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import os
+from tensorflow.examples.tutorials.mnist import input_data
+
 def process_mnist(fname = "MNIST_data/mnist.mat"):
 
 	d = sio.loadmat(fname)
@@ -32,5 +35,14 @@ def plot(samples, img_dim = 32):
 
     return fig
 
-
-
+def download_preprocess(fname = "MNIST_data/mnist.mat"):
+	mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+	train_data = mnist.train.images *2.0 -1.0
+	test_data = mnist.test.images *2.0 -1.0
+	train_label = mnist.train.labels
+	test_label = mnist.test.labels
+	sio.savemat( fname, {\
+		"train_data" : train_data, \
+		"test_data" : test_data, \
+		"train_label" : train_label,\
+		"test_label" : test_label})
