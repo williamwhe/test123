@@ -1,4 +1,5 @@
-#EvaGAN
+##
+EvaGAN
 ##
 -Dataset: load data
 -evagan: EvaGAN structure
