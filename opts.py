@@ -4,8 +4,8 @@ def parse_opt():
 
     parser = argparse.ArgumentParser()
     # Data input settings
-    parser.add_argument('--input_data', type=str, default = "MNIST", 
-                    help="dataset, MNIST or CIFAR10")
+    parser.add_argument('--input_data', type=str, default = "MNIST",
+                    help="input data MNIST or CIFAR10 " )
     parser.add_argument('--train_adv', type=bool, default = False,
                     help="using adverarial loss or not " )
     parser.add_argument('--pretrain_iteration', type=int, default = 20000,
@@ -46,10 +46,10 @@ def parse_opt():
                     help='learning rate')
     parser.add_argument('--learning_rate_decay_start', type=int, default=-1, 
                     help='at what iteration to start decaying learning rate? (-1 = dont) (in epoch)')
-    parser.add_argument('--decay_iteration_max', type=int, default= 10000, help='decay iteration max')
+    parser.add_argument('--decay_iteration_max', type=int, default= 50000, help='decay iteration max')
     parser.add_argument('--learning_rate_decay_every', type=int, default=20000, 
                     help='every how many iterations thereafter to drop LR by half?(in epoch)')
-    parser.add_argument('--save_checkpoint_every', type=int, default=5000,
+    parser.add_argument('--save_checkpoint_every', type=int, default=2500,
                     help='how often to save a model checkpoint (in iterations)?')
     parser.add_argument('--losses_log_every', type=int, default=100,
                     help='How often do we snapshot losses, for inclusion in the progress dump? (0 = disable)')       

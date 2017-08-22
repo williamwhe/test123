@@ -21,7 +21,7 @@ class EvaGAN():
 
         self._build_model()
         self.sess = sess
-        self.saver = tf.train.Saver(max_to_keep =100)
+        self.saver = tf.train.Saver(max_to_keep =100000)
         self.sess.run(tf.global_variables_initializer())
         # self.sess.run(tf.local_variables_initializer())
         # self.sess.run(tf.initialize_all_variables())
@@ -65,8 +65,6 @@ class EvaGAN():
         self.g_bn_d3 = batch_norm(name='g_bn_d3')
         self.g_bn_d4 = batch_norm(name='g_bn_d4')
         
-
-        ld = 0.3
         self.lr = tf.Variable(0.001, trainable = False,  name = "learning_rate")
 
         input_c_dim = self.opts.input_c_dim

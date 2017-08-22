@@ -9,7 +9,7 @@ def iterVsAttack( ):
     ax = plt.gca()
     iters = [] # iteration 
     atrs = [] # attack succes rate
-    with open('out6/result.txt' , 'r') as fid:
+    with open('out5/result.txt' , 'r') as fid:
     	rows = fid.read().strip().split('\n')
     	for row in rows:
     		tmps = row.split(',')

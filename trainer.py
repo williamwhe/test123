@@ -30,6 +30,7 @@ def train():
         mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
         train_data =  mnist.train.images * 2.0 - 1.0
         train_label = mnist.train.labels
+
         loader = Dataset(train_data, train_label)
         test_data = mnist.test.images * 2.0 - 1.0
         test_label = mnist.test.labels
@@ -39,6 +40,7 @@ def train():
         cifar10.maybe_download_and_extract()
         images_train, cls_train, labels_train = cifar10.load_training_data()
         images_test, cls_test, labels_test = cifar10.load_test_data()
+        #maybe need mapping to -1-1
         loader = Dataset( images_train, labels_train)
         test_loader = Dataset( images_test, labels_test)
 

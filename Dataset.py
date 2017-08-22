@@ -9,7 +9,8 @@ class Dataset:
         self._data = data
         self._label = label
         self._num_examples = data.shape[0]
-
+        self._num_labels = label.shape[1]
+        self._negative_example_list = [[] for _ in range(self._num_labels)]
         pass
 
     @property
@@ -57,7 +58,9 @@ class Dataset:
 
     # random generate negative samples 
     # may be take a long time 
-    def get_negative(self, batch_size, labels):
+    # priority == Ture means that we select the negative samples from the  labeled negative samples at first
+    
+    def get_negative(self, batch_size, labels, priority=True):
 
         fake_ids = np.random.randint(self._num_examples, size=batch_size)
         self._label[fake_ids]
@@ -69,6 +72,14 @@ class Dataset:
                 break
             fake_ids[collision_flag] = np.random.randint(self._num_examples, size = len(collision_flag))
         return self._data[fake_ids], self._label[fake_ids]
+
+    def insert_negative_sample(self, data, labels):
+        label_idx = np.argmax(labels, axis = 1)
+        for i, label_i in enumerate(label_idx):
+            self._negative_example_list[label_i].append(self._data[ i, :])
+
+
+
     def get_image_by_index(self, label, b_size = 1):
         new_label = np.argmax(self._label, axis = 1)
         idxs = np.where(new_label == label)[0]
