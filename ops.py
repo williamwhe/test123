@@ -3,8 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.python.framework import ops
-
-from utils import *
+import pdb
 
 class batch_norm(object):
             # h1 = lrelu(tf.contrib.layers.batch_norm(conv2d(h0, self.df_dim*2, name='d_h1_conv'),decay=0.9,updates_collections=None,epsilon=0.00001,scale=True,scope="d_h1_conv"))
@@ -50,8 +49,9 @@ def conv2d(input_, output_dim,
         conv = tf.nn.conv2d(input_, w, strides=[1, d_h, d_w, 1], padding='SAME')
 
         biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
-        conv = tf.reshape(tf.nn.bias_add(conv, biases), [-1] + conv.get_shape()[-3:])
-
+#        pdb.set_trace()
+#        conv = tf.reshape(tf.nn.bias_add(conv, biases), [-1] + conv.get_shape()[-3:])
+        conv = tf.nn.bias_add(conv, biases)
         return conv
 
 def deconv2d(input_, output_shape,
@@ -72,8 +72,8 @@ def deconv2d(input_, output_shape,
                                 strides=[1, d_h, d_w, 1])
 
         biases = tf.get_variable('biases', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
-        deconv = tf.reshape(tf.nn.bias_add(deconv, biases), [-1] + deconv.get_shape()[-3:])
-
+       # deconv = tf.reshape(tf.nn.bias_add(deconv, biases), [-1] + deconv.get_shape()[-3:])
+        deconv = tf.nn.bias_add(deconv, biases)
         if with_w:
             return deconv, w, biases
         else:
