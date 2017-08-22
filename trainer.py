@@ -18,6 +18,7 @@ import opts
 from Dataset import Dataset
 from utils import plot
 from evagan import EvaGAN
+import cifar10
 
 def train():
     opt = opts.parse_opt()
@@ -25,18 +26,25 @@ def train():
         os.mkdir(opt.image_path)
     if not os.path.exists(opt.checkpoint_path):
         os.mkdir(opt.checkpoint_path)
-    if opt.input_data == "MNIST" :
+    if opt.input_data.upper() == "MNIST" :
         mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
         train_data =  mnist.train.images * 2.0 - 1.0
-        train_label = data.train.labels
+        train_label = mnist.train.labels
         loader = Dataset(train_data, train_label)
         test_data = mnist.test.images * 2.0 - 1.0
         test_label = mnist.test.labels
-    elif opt.input_data == "CIFAR":
-        data = ....
+        test_loader = Dataset(test_data, test_label)
+
+    elif opt.input_data.upper() == "CIFAR":
+        cifar10.maybe_download_and_extract()
+        images_train, cls_train, labels_train = cifar10.load_training_data()
+        images_test, cls_test, labels_test = cifar10.load_test_data()
+        loader = Dataset( images_train, labels_train)
+        test_loader = Dataset( images_test, labels_test)
+
     # mnist = sio.loadmat('MNIST_data/mnist.mat')
 
-    test_loader = Dataset(test_data, test_label)
+    # test_loader = Dataset(test_data, test_label)
 
     x_dim = train_data.shape[1]
     y_dim = train_label.shape[1]

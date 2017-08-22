@@ -4,6 +4,8 @@ def parse_opt():
 
     parser = argparse.ArgumentParser()
     # Data input settings
+    parser.add_argument('--input_data', type=str, default = "MNIST", 
+                    help="dataset, MNIST or CIFAR10")
     parser.add_argument('--train_adv', type=bool, default = False,
                     help="using adverarial loss or not " )
     parser.add_argument('--pretrain_iteration', type=int, default = 20000,
