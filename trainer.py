@@ -86,6 +86,9 @@ def train():
             checkpoint_path = os.path.join(opt.load_checkpoint_path, 'model.ckpt')
             checkpoint_path += "-" + str(iteration)
             model.load(checkpoint_path)
+            ###load negative samples
+            checkpoint_path = opt.load_checkpoint_path + "/negative_"  + str(iteration) +".mat"
+            loader.load_negative_sample(checkpoint_path)
 
         # Assign the learning rate
             
@@ -197,8 +200,11 @@ def train():
                 with open(opt.image_path + "/" + "ld_" + str(opt.ld) +  "_result.txt", 'a') as fid :
                     log = "iteration:{}, attack rate: {} \n".format( str(iteration), str(acc / float(i * batch_size) ))
                     fid.write(log)
+                # save model 
                 checkpoint_path = os.path.join(opt.checkpoint_path, 'model.ckpt')
                 model.saver.save(sess, checkpoint_path, global_step = iteration) 
+                # save negative samples
+                loader.save_negative_sample(opt.checkpoint_path + "/negative_" + str(iteration) + ".mat" ) 
 
 if __name__ == "__main__":
     train()

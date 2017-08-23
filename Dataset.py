@@ -1,5 +1,6 @@
 import pdb
 import numpy as np
+import scipy.io as sio
 import random
 class Dataset:
 
@@ -113,8 +114,17 @@ class Dataset:
                 sort_idx = np.argsort(self._negative_magnitude[label_i])
                 self._negative_example_list[label_i] = self._negative_example_list[label_i][sort_idx[-threshold:]]
 
-
-
+    def save_negative_sample(self, fname):
+        sio.savemat( fname,  {
+             "negative" : np.array( self._negative_example_list ),
+             "magnitude" : np.array( self._negative_magnitude )
+        })
+    
+    def load_negative_sample(self, fname):
+        d =  sio.loadmat( fname )
+        self._negative_example_list = d["negative"]
+        self._negative_magnitude = d["magnitude"]
+        
     def get_image_by_index(self, label, b_size = 1):
         new_label = np.argmax(self._label, axis = 1)
         idxs = np.where(new_label == label)[0]
