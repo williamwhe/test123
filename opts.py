@@ -4,9 +4,11 @@ def parse_opt():
 
     parser = argparse.ArgumentParser()
     # Data input settings
+    parser.add_argument('--add_neg_iteration', type=int, default=15000, 
+                    help="add negative samples from generator")
     parser.add_argument('--input_data', type=str, default = "MNIST",
                     help="input data MNIST or CIFAR10 " )
-    parser.add_argument('--train_adv', type=bool, default = False,
+    parser.add_argument('--train_adv', type=int, default = 0,
                     help="using adverarial loss or not " )
     parser.add_argument('--pretrain_iteration', type=int, default = 20000,
                     help="pretrain iteration" )
@@ -26,7 +28,7 @@ def parse_opt():
                     help='discriminator_filter_dim')       
     parser.add_argument('--iteration', type=int, default = 35000,
                     help='load_iteration_number')       
-    parser.add_argument('--fine_tune', type=bool, default=False,
+    parser.add_argument('--fine_tune', type=int, default=0,
                     help='fine_tune')
     parser.add_argument('--img_dim', type=int, default = 28,
                     help='image_w_h_dim')      

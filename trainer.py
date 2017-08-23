@@ -19,6 +19,8 @@ from Dataset import Dataset
 from utils import plot
 from evagan import EvaGAN
 import cifar10
+from utils import save_images
+
 
 def train():
     opt = opts.parse_opt()
@@ -62,7 +64,7 @@ def train():
     fine_tune = opt.fine_tune
     D = MLP(layers = (h_dim))
     if fine_tune:
-        D.load( opt.checkpoint_path + "/mlp_model")
+        D.load( opt.load_checkpoint_path + "/mlp_model")
     else:
         D.train(train_data, train_label)
         D.save( opt.checkpoint_path + "/mlp_model")
@@ -79,14 +81,11 @@ def train():
         iteration = 0
         print fine_tune
         if fine_tune:
+            print "FINE-TUNE"
             iteration = opt.iteration
             checkpoint_path = os.path.join(opt.load_checkpoint_path, 'model.ckpt')
             checkpoint_path += "-" + str(iteration)
             model.load(checkpoint_path)
-            opt.train_adv = True
-        else:
-            #start from begin
-            epoch = 0
 
         # Assign the learning rate
             
@@ -95,7 +94,6 @@ def train():
             # pretrain at first
             start = time.time()
             # Load data from train split (0)
-            data = loader.next_batch(batch_size)
             # print('Read data:', time.time() - start)
             if iteration != 0 \
                 and ( iteration %  opt.learning_rate_decay_every )== 0:
@@ -108,10 +106,14 @@ def train():
                 sess.run(tf.assign(model.lr, opt.learning_rate))
         
 
-            if iteration < opt.pretrain_iteration or opt.train_adv == False:
+            if iteration < opt.pretrain_iteration and opt.train_adv == False:
+
             #stageI CGAN + look like loss
+            # one to one mapping 
                 start = time.time()
-                feed = {model.source : data[0], model.target: data[0], model.label : data[1]}
+                data = loader.next_batch(batch_size, negative = False ) 
+                #training without negative samples 
+                feed = {model.source : data[0], model.target: data[0]}
 
 
                 for _ in range(5):
@@ -119,26 +121,25 @@ def train():
                 D_loss, _ = sess.run([model.D_loss, model.D_pre_train_op], feed)
 
                 end = time.time()
+                ### genrate negative samples;
 
                 if iteration != 0 and iteration % opt.losses_log_every == 0:
                     print "time: ", end - start 
                     print "loss", D_loss, G_loss
                     print "iteration: ", iteration
-                    print "pretrain lr", sess.run(model.lr)
-            else:
-            #stage II add adversarial loss
-
+            else:#stage II add adversarial loss
                 start = time.time()
-                feed = {model.source : data[0], model.label : data[1]}
+                data = loader.next_batch(batch_size, negative = True, priority = True) 
+                feed = { model.source : data[0]}
                 sample = sess.run(model.fake_images_sample_flatten, feed)
                 predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)
-                
+                ###select success 
                 feed = {model.source :  data[0], \
                     model.predict_labels: predict_labels,\
                     model.negative_sample : data[2], \
                     model.target : data[0]}
-                
-                G_loss, _ = sess.run([model.G_loss2, model.G_train_op], feed)
+                for _ in range(5):
+                    G_loss, _ = sess.run([model.G_loss2, model.G_train_op], feed)
                 D_loss, _ = sess.run([model.D_loss2, model.D_train_op], feed)
     
                 end = time.time()
@@ -148,9 +149,23 @@ def train():
                     print "loss: ", D_loss, G_loss
                     print "iteration: ", iteration
                     print "adv lr: ",  sess.run(model.lr)
-                # Update the iteration and epoch
+            
+            # when it can genearator "look like " sample, 
+            # select negative samples from the generator 
+
+            if iteration > opt.add_neg_iteration :
+                    
+                feed = {model.source : data[0]}
+                sample = sess.run(model.fake_images_sample_flatten, feed)
+                predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)
+                atr_idx = np.where(predict_labels == 1)[0]
+                # insert some negative samples
+                
+                magnitude = np.sum( abs( sample - data[0] ) ,axis = 1)
+#                pdb.set_trace()
+                loader.insert_negative_sample(sample[atr_idx, :],  data[1][atr_idx, :] , magnitude[atr_idx])
+            # Update the iteration and epoch
             iteration += 1
-            # epoch = loader._epochs_completed
                 
             if (iteration != 0 and iteration % opt.save_checkpoint_every == 0):
 
@@ -161,9 +176,9 @@ def train():
                     iter_num = 500
                 for i in range( iter_num):
 
-                    s_imgs, s_label, n_imgs, n_label  = test_loader.next_batch(batch_size)
+                    s_imgs, s_label  = test_loader.next_batch(batch_size, negative = False)
             
-                    feed = {model.source : s_imgs, model.label : s_label}
+                    feed = {model.source : s_imgs}
                     samples = sess.run(model.fake_images_sample_flatten, feed)
                     predict_label = D.predict( samples, s_label)
                     acc += float( np.sum(predict_label) ) 
@@ -172,10 +187,12 @@ def train():
                 # eval model
                 # Write validation result into summary
                 s_imgs, s_label  = test_loader.get_all_images(batch_size)
-                feed = {model.source : s_imgs, model.label : s_label}
+                feed = {model.source : s_imgs}
                 samples = sess.run(model.fake_images_sample, feed)
-                fig = plot(samples)
-                plt.savefig( opt.image_path + '/{}.png'.format(str(iteration)), bbox_inches='tight')
+
+                save_images(samples, [4,  4], opt.image_path + '/{}.png'.format(str(iteration)) )
+                # fig = plot(samples)
+                # plt.savefig( opt.image_path + '/{}.png'.format(str(iteration)), bbox_inches='tight')
                 ### save log into a file 
                 with open(opt.image_path + "/" + "ld_" + str(opt.ld) +  "_result.txt", 'a') as fid :
                     log = "iteration:{}, attack rate: {} \n".format( str(iteration), str(acc / float(i * batch_size) ))
@@ -185,4 +202,3 @@ def train():
 
 if __name__ == "__main__":
     train()
-# test()

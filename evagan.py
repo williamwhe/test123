@@ -93,9 +93,6 @@ class EvaGAN():
             tf.reshape( self.negative_sample, [-1, img_dim, img_dim, input_c_dim]), \
             [32, 32])   
         
-
-        self.label = tf.placeholder(tf.float32, [None, label_dim], name = "label")
-
         self.predict_labels = tf.placeholder(tf.float32, [None, 1], \
                                 name = "predict_label")
         self.fake_images = self.generator(self.image)
@@ -200,22 +197,24 @@ class EvaGAN():
     def discriminator(self, image, y = None, reuse = False):
 
         with tf.variable_scope("discriminator") as scope:
-
-            # image is 256 x 256 x (input_c_dim + output_c_dim)
+            s = 32
+            s2, s4, s8, s16  = int(s/2), int(s/4), int(s/8), int(s/16)            
             if reuse:
                 tf.get_variable_scope().reuse_variables()
             else:
                 assert tf.get_variable_scope().reuse == False
 
             h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
-            # h0 is (128 x 128 x self.df_dim) 32 x 32
+            # h0 is (128 x 128 x self.df_dim) 16 x 16 x df_dim
             h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, name='d_h1_conv')))
-            # h1 is (64 x 64 x self.df_dim*2) 16 x 16
+            # h1 is (64 x 64 x self.df_dim*2) 8 x 8 x df_dim*2
             h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
-            # h2 is (32x 32 x self.df_dim*4)  8 x 8
+            # h2 is (32x 32 x self.df_dim*4)  4 x 4 x df_dim*4
             h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='d_h3_conv')))
-            # h3 is (16 x 16 x self.df_dim*8) 4 x 4 
-            h4 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd_h3_lin')
+            # pdb.set_trace()
+            # h3 is (16 x 16 x self.df_dim*8) 4 x 4 x df_dim*8
+            # h4 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd_h3_lin')
+            h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'd_h3_lin')
 
             return tf.nn.sigmoid(h4), h4
 
@@ -225,7 +224,9 @@ class EvaGAN():
     def discriminator2(self, image, y = None, reuse = False):
 
         with tf.variable_scope("discriminator") as scope:
-
+            s = 32
+            # s2, s4, s8, s16, s32, s64, s128 = int(s/2), int(s/4), int(s/8), int(s/16), int(s/32), int(s/64), int(s/128)
+            s2, s4, s8, s16  = int(s/2), int(s/4), int(s/8), int(s/16)
             # image is 256 x 256 x (input_c_dim + output_c_dim)
             if reuse:
                 tf.get_variable_scope().reuse_variables()
@@ -240,10 +241,9 @@ class EvaGAN():
             # h2 is (32x 32 x self.df_dim*4)  8 x 8
             h3 = lrelu(self.d2_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='d2_h3_conv')))
             # h3 is (16 x 16 x self.df_dim*8) 4 x 4 
-            h4 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd2_h3_lin')
+            h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'd2_h3_lin')
 
             return tf.nn.sigmoid(h4), h4
-
 
 
     def generator(self, image, y=None):
@@ -347,4 +347,3 @@ class EvaGAN():
             self.d5, self.d5_w, self.d5_b = deconv2d(tf.nn.relu(d4),
                 [self.batch_size, s, s, self.output_c_dim], name='g_d5', with_w=True)
             return tf.nn.tanh(self.d5)
-
