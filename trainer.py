@@ -20,7 +20,7 @@ from utils import plot
 from evagan import EvaGAN
 import cifar10
 from utils import save_images
-os.environ['CUDA_VISIBLE_DEVICES'] = "2"
+# os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 def train():
     opt = opts.parse_opt()
@@ -113,8 +113,8 @@ def train():
                 feed = {model.source : data[0], model.target: data[0]}
 
 
-                # for _ in range(5):
-                G_loss, _ = sess.run([model.G_loss, model.G_pre_train_op], feed)
+                for _ in range(3):
+                    G_loss, _ = sess.run([model.G_loss, model.G_pre_train_op], feed)
                 D_loss, _ = sess.run([model.D_loss, model.D_pre_train_op], feed)
 
                  ### genrate negative samples;
@@ -134,8 +134,8 @@ def train():
                     model.predict_labels: predict_labels,\
                     model.negative_sample : data[2], \
                     model.target : data[0]}
-                # for _ in range(5):
-                adv_G_loss, G_loss, _ = sess.run([model.adv_G_loss, model.G_loss2, model.G_train_op], feed)
+                for _ in range(2):
+                    adv_G_loss, G_loss, _ = sess.run([model.adv_G_loss, model.G_loss2, model.G_train_op], feed)
                 adv_D_loss, D_loss,_ = sess.run([model.adv_D_loss, model.D_loss2, model.D_train_op], feed)
     
                 if iteration != 0 and iteration % opt.losses_log_every == 0:    
