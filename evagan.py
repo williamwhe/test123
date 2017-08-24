@@ -50,9 +50,9 @@ class EvaGAN():
         self.d_bn2 = batch_norm(name='d_bn2')
         self.d_bn3 = batch_norm(name='d_bn3')
 
-        self.d2_bn1 = batch_norm(name='d2_bn1')
-        self.d2_bn2 = batch_norm(name='d2_bn2')
-        self.d2_bn3 = batch_norm(name='d2_bn3')
+        self.d2_bn1 = batch_norm(name='adv_d_bn1')
+        self.d2_bn2 = batch_norm(name='adv_d_bn2')
+        self.d2_bn3 = batch_norm(name='adv_d_bn3')
 
 
         self.g_bn_e2 = batch_norm(name='g_bn_e2')
@@ -131,7 +131,7 @@ class EvaGAN():
                 )\
             )
 
-        G_loss2 = tf.reduce_mean( \
+        adv_G_loss= tf.reduce_mean( \
             tf.nn.sigmoid_cross_entropy_with_logits(\
                 logits=D_fake_logit2, \
                 labels=tf.ones_like(D_fake_logit2)\
@@ -141,18 +141,16 @@ class EvaGAN():
 
         ####
       
-        self.G_loss = G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image))
-        self.D_loss = D_real_loss + D_fake_loss
-        self.G_loss2  = G_loss2
-        self.D_loss2 = D_real_loss2 + D_fake_loss2
-
+        self.G_loss = G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image) )
+        D_loss = D_real_loss + D_fake_loss
+        self.D_loss = D_loss
 
         t_vars = tf.trainable_variables()
 
         self.d_vars = [var for var in t_vars if 'd_' in var.name]
         self.g_vars = [var for var in t_vars if 'g_' in var.name]
      
-        self.d2_vars = [var for var in t_vars if 'd2_' in var.name]
+        self.adv_d_vars = [var for var in t_vars if 'adv_d_' in var.name]
         
         D_pre_opt = tf.train.AdamOptimizer(self.lr)
         D_grads_and_vars_pre = D_pre_opt.compute_gradients(self.D_loss, self.d_vars)
@@ -169,14 +167,22 @@ class EvaGAN():
     
 
         #adversarial perturbation 
+        adv_D_loss = D_real_loss2 + D_fake_loss2
+        self.adv_G_loss = adv_G_loss
+        self.adv_D_loss = adv_D_loss
 
-        self.G_loss2 = ld * self.G_loss + (1 - ld) * self.G_loss2
-        self.D_loss2 = ld * ( self.D_loss ) + (1 - ld)*(self.D_loss2)
+   
+        self.G_loss2 = ld * G_loss + (1 - ld) * adv_G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image) )
+        self.D_loss2 = ld * D_loss  + (1 - ld) * adv_D_loss
+
+
+        # self.G_loss2 = ld * self.G_loss + (1 - ld) * self.G_loss2
+        # self.D_loss2 = ld * ( self.D_loss ) + (1 - ld)*(self.D_loss2)
         
         # gradient clipping
      
         D_opt = tf.train.AdamOptimizer(self.lr)
-        D_grads_and_vars = D_opt.compute_gradients(self.D_loss2, self.d2_vars + self.d_vars)
+        D_grads_and_vars = D_opt.compute_gradients(self.D_loss2, self.adv_d_vars + self.d_vars)
         D_grads_and_vars = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in D_grads_and_vars]
         #grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
         self.D_train_op = D_opt.apply_gradients(D_grads_and_vars)
@@ -184,7 +190,7 @@ class EvaGAN():
 
         G_opt = tf.train.AdamOptimizer(self.lr)
 
-        G_grads_and_vars = G_opt.compute_gradients(-self.G_loss2, self.g_vars)
+        G_grads_and_vars = G_opt.compute_gradients(self.G_loss2, self.g_vars)
         # G_grads_and_vars = G_opt.compute_gradients(self.G_loss, G_Ws + G_bs)
         # #end 
         G_grads_and_vars = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in G_grads_and_vars]
@@ -221,7 +227,7 @@ class EvaGAN():
     ####
     #adversarial discriminator
     ####
-    def discriminator2(self, image, y = None, reuse = False):
+    def adv_discriminator(self, image, y = None, reuse = False):
 
         with tf.variable_scope("discriminator") as scope:
             s = 32
@@ -233,15 +239,15 @@ class EvaGAN():
             else:
                 assert tf.get_variable_scope().reuse == False
 
-            h0 = lrelu(conv2d(image, self.df_dim, name='d2_h0_conv'))
+            h0 = lrelu(conv2d(image, self.df_dim, name='adv_d_h0_conv'))
             # h0 is (128 x 128 x self.df_dim) 32 x 32
-            h1 = lrelu(self.d2_bn1(conv2d(h0, self.df_dim*2, name='d2_h1_conv')))
+            h1 = lrelu(self.d2_bn1(conv2d(h0, self.df_dim*2, name='adv_d_h1_conv')))
             # h1 is (64 x 64 x self.df_dim*2) 16 x 16
-            h2 = lrelu(self.d2_bn2(conv2d(h1, self.df_dim*4, name='d2_h2_conv')))
+            h2 = lrelu(self.d2_bn2(conv2d(h1, self.df_dim*4, name='adv_d_h2_conv')))
             # h2 is (32x 32 x self.df_dim*4)  8 x 8
-            h3 = lrelu(self.d2_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='d2_h3_conv')))
+            h3 = lrelu(self.d2_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='adv_d_h3_conv')))
             # h3 is (16 x 16 x self.df_dim*8) 4 x 4 
-            h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'd2_h3_lin')
+            h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'adv_d_h3_lin')
 
             return tf.nn.sigmoid(h4), h4
 

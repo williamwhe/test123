@@ -142,14 +142,14 @@ def train():
                     model.negative_sample : data[2], \
                     model.target : data[0]}
                 for _ in range(5):
-                    G_loss, _ = sess.run([model.G_loss2, model.G_train_op], feed)
+                    adv_G_loss, G_loss, _ = sess.run([model.adv_G_loss, model.G_loss2, model.G_train_op], feed)
                 D_loss, _ = sess.run([model.D_loss2, model.D_train_op], feed)
     
                 end = time.time()
 
                 if iteration != 0 and iteration % opt.losses_log_every == 0:
                     print "time: ", end - start 
-                    print "loss: ", D_loss, G_loss
+                    print "loss: ", D_loss, G_loss, G_adv_loss
                     print "iteration: ", iteration
                     print "adv lr: ",  sess.run(model.lr)
             
