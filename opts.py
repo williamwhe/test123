@@ -4,6 +4,8 @@ def parse_opt():
 
     parser = argparse.ArgumentParser()
     # Data input settings
+    parser.add_argument('--add_neg_every', type=int, default=5, 
+                    help="add negative samples from generator")    
     parser.add_argument('--add_neg_iteration', type=int, default=7500, 
                     help="add negative samples from generator")
     parser.add_argument('--input_data', type=str, default = "MNIST",

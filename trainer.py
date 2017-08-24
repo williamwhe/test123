@@ -148,7 +148,7 @@ def train():
             # when it can genearator "look like " sample, 
             # select negative samples from the generator 
 
-            if iteration > opt.add_neg_iteration :
+            if iteration > opt.add_neg_iteration and iteration % opt.add_neg_every == 0:
                     
                 feed = {model.source : data[0]}
                 sample = sess.run(model.fake_images_sample_flatten, feed)
