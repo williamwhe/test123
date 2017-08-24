@@ -20,7 +20,7 @@ from utils import plot
 from evagan import EvaGAN
 import cifar10
 from utils import save_images
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 def train():
     opt = opts.parse_opt()
@@ -93,6 +93,7 @@ def train():
         # Assign the learning rate
             
         # Assure in training mode
+        end2 = time.time()
         while True:
             # pretrain at first
             start = time.time()
@@ -127,9 +128,12 @@ def train():
                 ### genrate negative samples;
 
                 if iteration != 0 and iteration % opt.losses_log_every == 0:
-                    print "time: ", end - start 
+                    print "time: ", end - start
+                    start2 = time.time()
+                    print "total time: ", start2 - end2 
                     print "loss", D_loss, G_loss
                     print "iteration: ", iteration
+                    end2 = time.time()
             else:#stage II add adversarial loss
                 start = time.time()
                 data = loader.next_batch(batch_size, negative = True, priority = True) 
@@ -147,11 +151,14 @@ def train():
     
                 end = time.time()
 
-                if iteration != 0 and iteration % opt.losses_log_every == 0:
+                if iteration != 0 and iteration % opt.losses_log_every == 0:    
                     print "time: ", end - start 
-                    print "loss: ", D_loss, G_loss, G_adv_loss
+                    start2 = time.time()
+                    print "loss: ", D_loss, G_loss, adv_G_loss
                     print "iteration: ", iteration
                     print "adv lr: ",  sess.run(model.lr)
+                    print "total time:", start2 - end2
+                    end2 = time.time()
             
             # when it can genearator "look like " sample, 
             # select negative samples from the generator 
