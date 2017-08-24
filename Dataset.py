@@ -11,8 +11,8 @@ class Dataset:
         self._label = label
         self._num_examples = data.shape[0]
         self._num_labels = label.shape[1]
-        self._negative_example_list = [[] for _ in range(self._num_labels) ]
-        self._negative_magnitude = [ [] for _ in range(self._num_labels) ] 
+        self._negative_example_list = [np.array([]) for _ in range(self._num_labels) ]
+        self._negative_magnitude = [ np.array( [] ) for _ in range(self._num_labels) ] 
 
         pass
 
@@ -103,16 +103,25 @@ class Dataset:
                 fake_ids[collision_flag] = np.random.randint(self._num_examples, size = len(collision_flag))
             return self._data[fake_ids], self._label[fake_ids]
 
-    def insert_negative_sample(self, data, labels, magnitude  ,threshold = 1000):
+    def insert_negative_sample(self, data, labels, magnitude  ,threshold = 0):
         label_cls = np.argmax(labels, axis = 1)
         for i, label_i in enumerate(label_cls):
-            self._negative_example_list[label_i].append(self._data[ i, :])
-            self._negative_magnitude[label_i].append(self._data[i, :])
-            #pdb.set_trace()
+            if self._negative_example_list[label_i].shape[0] == 0:
+                self._negative_example_list[label_i] =  data[i, :]
+                self._negative_magnitude[label_i] = magnitude[i]
+    
+            self._negative_example_list[label_i] = np.vstack( [self._negative_example_list[label_i],  data[i, :]])
+
+            self._negative_magnitude[label_i] = np.vstack( [self._negative_magnitude[label_i], magnitude[i]] )
+
+            # self._negative_example_list[label_i] = np.concatenate( ( self._negative_example_list[label_i], data[i, :] ), axis = 0)
+
+            # self._negative_magnitude[label_i] = np.concatenate( ( self._negative_magnitude[label_i], magnitude[i, :]), axis = 0) 
             if len(self._negative_example_list[label_i] )  > (threshold + 300):
                 #remove ... only keep the most like example
-                sort_idx = np.argsort(self._negative_magnitude[label_i])
-                self._negative_example_list[label_i] = self._negative_example_list[label_i][sort_idx[-threshold:]]
+                sort_idx = np.argsort(self._negative_magnitude[label_i][:, 0])
+                self._negative_example_list[label_i] = self._negative_example_list[label_i][sort_idx[-threshold:], :]
+                self._negative_magnitude[label_i] = self._negative_magnitude[label_i][sort_idx[-threshold:], :]
 
     def save_negative_sample(self, fname):
         sio.savemat( fname,  {
