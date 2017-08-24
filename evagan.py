@@ -101,8 +101,8 @@ class EvaGAN():
         D_fake_loss, D_fake_logit =  self.discriminator(tf.concat( [self.fake_images, self.image], axis = 3) )
         D_real_loss, D_real_logit = self.discriminator(tf.concat( [self.real_image, self.image], axis = 3) , reuse = True)
 
-        D_fake_loss2, D_fake_logit2 = self.discriminator2(tf.concat( [self.fake_images, self.image], axis = 3))
-        D_real_loss2, D_real_logit2 = self.discriminator2(tf.concat( [self.adv_image, self.image], axis = 3), reuse = True) 
+        D_fake_loss2, D_fake_logit2 = self.adv_discriminator(tf.concat( [self.fake_images, self.image], axis = 3))
+        D_real_loss2, D_real_logit2 = self.adv_discriminator(tf.concat( [self.adv_image, self.image], axis = 3), reuse = True) 
 
 
         self.fake_images_sample = self.sampler(self.image)

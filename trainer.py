@@ -20,7 +20,7 @@ from utils import plot
 from evagan import EvaGAN
 import cifar10
 from utils import save_images
-
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 def train():
     opt = opts.parse_opt()
@@ -193,7 +193,7 @@ def train():
                 feed = {model.source : s_imgs}
                 samples = sess.run(model.fake_images_sample, feed)
 
-                save_images(samples, [4,  4], opt.image_path + '/{}.png'.format(str(iteration)) )
+                save_images(samples[0:16], [4,  4], opt.image_path + '/{}.png'.format(str(iteration)) )
                 # fig = plot(samples)
                 # plt.savefig( opt.image_path + '/{}.png'.format(str(iteration)), bbox_inches='tight')
                 ### save log into a file 

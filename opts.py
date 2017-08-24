@@ -10,7 +10,7 @@ def parse_opt():
                     help="input data MNIST or CIFAR10 " )
     parser.add_argument('--train_adv', type=int, default = 0,
                     help="using adverarial loss or not " )
-    parser.add_argument('--pretrain_iteration', type=int, default = 20000,
+    parser.add_argument('--pretrain_iteration', type=int, default = 10000,
                     help="pretrain iteration" )
     parser.add_argument('--ld', type=float, default = 0.8,
                     help='lambda_ratio')      
