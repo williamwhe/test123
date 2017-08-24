@@ -358,6 +358,6 @@ class EvaGAN():
         samples = []
         img_len = len( images )
         for i in range( 0, img_len - self.batch_size, self.batch_size):
-feed = {model.source : data[0]}
-                sample = sess.run(model.fake_images_sample_flatten, feed)
-                predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)
+            feed = {model.source : data[0]}
+            sample = sess.run(model.fake_images_sample_flatten, feed)
+            predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)

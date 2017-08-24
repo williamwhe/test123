@@ -83,7 +83,7 @@ class Dataset:
                      neg_labels.append( neg_label )
                 else:
                     while True:
-                        fake_id = random.randint(0, self._num_examples)
+                        fake_id = random.randint(0, self._num_examples-1)
                         if not np.argmax( self._label[fake_id] ) == label_idx:
                             break
                     neg_datas.append( self._data[fake_id, :])
