@@ -134,8 +134,8 @@ def train():
                     model.predict_labels: predict_labels,\
                     model.negative_sample : data[2], \
                     model.target : data[0]}
-                for _ in range(5):
-                    adv_G_loss, G_loss, _ = sess.run([model.adv_G_loss, model.G_loss2, model.G_train_op], feed)
+                # for _ in range(5):
+                adv_G_loss, G_loss, _ = sess.run([model.adv_G_loss, model.G_loss2, model.G_train_op], feed)
                 adv_D_loss, D_loss,_ = sess.run([model.adv_D_loss, model.D_loss2, model.D_train_op], feed)
     
                 if iteration != 0 and iteration % opt.losses_log_every == 0:    
