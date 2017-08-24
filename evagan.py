@@ -50,9 +50,9 @@ class EvaGAN():
         self.d_bn2 = batch_norm(name='d_bn2')
         self.d_bn3 = batch_norm(name='d_bn3')
 
-        self.d2_bn1 = batch_norm(name='adv_d_bn1')
-        self.d2_bn2 = batch_norm(name='adv_d_bn2')
-        self.d2_bn3 = batch_norm(name='adv_d_bn3')
+        self.d2_bn1 = batch_norm(name='adv_bn1')
+        self.d2_bn2 = batch_norm(name='adv_bn2')
+        self.d2_bn3 = batch_norm(name='adv_bn3')
 
 
         self.g_bn_e2 = batch_norm(name='g_bn_e2')
@@ -150,7 +150,7 @@ class EvaGAN():
         self.d_vars = [var for var in t_vars if 'd_' in var.name]
         self.g_vars = [var for var in t_vars if 'g_' in var.name]
      
-        self.adv_d_vars = [var for var in t_vars if 'adv_d_' in var.name]
+        self.adv_d_vars = [var for var in t_vars if 'adv_' in var.name]
         
         D_pre_opt = tf.train.AdamOptimizer(self.lr)
         D_grads_and_vars_pre = D_pre_opt.compute_gradients(self.D_loss, self.d_vars)
@@ -229,7 +229,7 @@ class EvaGAN():
     ####
     def adv_discriminator(self, image, y = None, reuse = False):
 
-        with tf.variable_scope("discriminator") as scope:
+        with tf.variable_scope("adv_discriminator") as scope:
             s = 32
             # s2, s4, s8, s16, s32, s64, s128 = int(s/2), int(s/4), int(s/8), int(s/16), int(s/32), int(s/64), int(s/128)
             s2, s4, s8, s16  = int(s/2), int(s/4), int(s/8), int(s/16)
@@ -239,15 +239,15 @@ class EvaGAN():
             else:
                 assert tf.get_variable_scope().reuse == False
 
-            h0 = lrelu(conv2d(image, self.df_dim, name='adv_d_h0_conv'))
+            h0 = lrelu(conv2d(image, self.df_dim, name='adv_h0_conv'))
             # h0 is (128 x 128 x self.df_dim) 32 x 32
-            h1 = lrelu(self.d2_bn1(conv2d(h0, self.df_dim*2, name='adv_d_h1_conv')))
+            h1 = lrelu(self.d2_bn1(conv2d(h0, self.df_dim*2, name='adv_h1_conv')))
             # h1 is (64 x 64 x self.df_dim*2) 16 x 16
-            h2 = lrelu(self.d2_bn2(conv2d(h1, self.df_dim*4, name='adv_d_h2_conv')))
+            h2 = lrelu(self.d2_bn2(conv2d(h1, self.df_dim*4, name='adv_h2_conv')))
             # h2 is (32x 32 x self.df_dim*4)  8 x 8
-            h3 = lrelu(self.d2_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='adv_d_h3_conv')))
+            h3 = lrelu(self.d2_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='adv_h3_conv')))
             # h3 is (16 x 16 x self.df_dim*8) 4 x 4 
-            h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'adv_d_h3_lin')
+            h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'adv_h3_lin')
 
             return tf.nn.sigmoid(h4), h4
 
