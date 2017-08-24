@@ -45,11 +45,6 @@ def train():
         #maybe need mapping to -1-1
         loader = Dataset( images_train, labels_train)
         test_loader = Dataset( images_test, labels_test)
-
-    # mnist = sio.loadmat('MNIST_data/mnist.mat')
-
-    # test_loader = Dataset(test_data, test_label)
-
     x_dim = train_data.shape[1]
     y_dim = train_label.shape[1]
     # pdb.set_trace()
@@ -94,48 +89,42 @@ def train():
             
         # Assure in training mode
         end2 = time.time()
+        sess.run(tf.assign( model.lr, opt.learning_rate ))
         while True:
             # pretrain at first
-            start = time.time()
             # Load data from train split (0)
             # print('Read data:', time.time() - start)
             if iteration != 0 \
                 and ( iteration %  opt.learning_rate_decay_every )== 0:
             
-                frac = (iteration - opt.learning_rate_decay_start) / opt.learning_rate_decay_every
+                frac = iteration / opt.learning_rate_decay_every
 
                 decay_factor = 0.5  ** frac
                 sess.run(tf.assign( model.lr, opt.learning_rate * decay_factor))
-            else:
-                sess.run(tf.assign(model.lr, opt.learning_rate))
-        
+
 
             if iteration < opt.pretrain_iteration and opt.train_adv == False:
 
-            #stageI CGAN + look like loss
-            # one to one mapping 
-                start = time.time()
+                #stageI CGAN + look like loss
+                # one to one mapping 
+ 
                 data = loader.next_batch(batch_size, negative = False ) 
                 #training without negative samples 
                 feed = {model.source : data[0], model.target: data[0]}
 
 
-                for _ in range(5):
-                    G_loss, _ = sess.run([model.G_loss, model.G_pre_train_op], feed)
+                # for _ in range(5):
+                G_loss, _ = sess.run([model.G_loss, model.G_pre_train_op], feed)
                 D_loss, _ = sess.run([model.D_loss, model.D_pre_train_op], feed)
 
-                end = time.time()
-                ### genrate negative samples;
-
+                 ### genrate negative samples;
                 if iteration != 0 and iteration % opt.losses_log_every == 0:
-                    print "time: ", end - start
                     start2 = time.time()
                     print "total time: ", start2 - end2 
                     print "loss", D_loss, G_loss
                     print "iteration: ", iteration
                     end2 = time.time()
             else:#stage II add adversarial loss
-                start = time.time()
                 data = loader.next_batch(batch_size, negative = True, priority = True) 
                 feed = { model.source : data[0]}
                 sample = sess.run(model.fake_images_sample_flatten, feed)
@@ -147,17 +136,13 @@ def train():
                     model.target : data[0]}
                 for _ in range(5):
                     adv_G_loss, G_loss, _ = sess.run([model.adv_G_loss, model.G_loss2, model.G_train_op], feed)
-                D_loss, _ = sess.run([model.D_loss2, model.D_train_op], feed)
+                adv_D_loss, D_loss,_ = sess.run([model.adv_D_loss, model.D_loss2, model.D_train_op], feed)
     
-                end = time.time()
-
                 if iteration != 0 and iteration % opt.losses_log_every == 0:    
-                    print "time: ", end - start 
                     start2 = time.time()
-                    print "loss: ", D_loss, G_loss, adv_G_loss
-                    print "iteration: ", iteration
-                    print "adv lr: ",  sess.run(model.lr)
                     print "total time:", start2 - end2
+                    print "loss(D, G, adv_D,adv_G): ", D_loss, G_loss, adv_D_loss, adv_G_loss
+                    print "iteration: ", iteration
                     end2 = time.time()
             
             # when it can genearator "look like " sample, 
@@ -211,7 +196,7 @@ def train():
                 checkpoint_path = os.path.join(opt.checkpoint_path, 'model.ckpt')
                 model.saver.save(sess, checkpoint_path, global_step = iteration) 
                 # save negative samples
-                loader.save_negative_sample(opt.checkpoint_path + "/negative_" + str(iteration) + ".mat" ) 
+                loader.save_negative_sample(opt.checkpoint_path + "/negative_" + str(iteration) + ".mat" )
 
 if __name__ == "__main__":
     train()

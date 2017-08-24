@@ -353,3 +353,11 @@ class EvaGAN():
             self.d5, self.d5_w, self.d5_b = deconv2d(tf.nn.relu(d4),
                 [self.batch_size, s, s, self.output_c_dim], name='g_d5', with_w=True)
             return tf.nn.tanh(self.d5)
+
+    def transform(self, images, sess):
+        samples = []
+        img_len = len( images )
+        for i in range( 0, img_len - self.batch_size, self.batch_size):
+feed = {model.source : data[0]}
+                sample = sess.run(model.fake_images_sample_flatten, feed)
+                predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)
