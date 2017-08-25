@@ -13,6 +13,9 @@ import math
 from sklearn.ensemble import VotingClassifier
 import cPickle
 from sklearn.externals import joblib
+import tensorflow as tf
+import prettytensor as pt
+import os
 class Discriminator(object):
     """
     The basic class for discriminator
@@ -70,12 +73,6 @@ class Discriminator(object):
     def load(self, fname):
         with open(fname, 'rb') as fid:
             self.model = cPickle.load(fid)
-    
-    # def save(self, fname):
-    #     joblib.dump(self.model, fname + '.pkl')
-
-    # def load(self, fname):
-    #     self.model = joblib.load(fname + ".pkl")
 
     def getName(self):
         return self.name
@@ -152,9 +149,7 @@ class MLP(Discriminator):
         y_pred = self.model.predict(X)
         y_binary = np.zeros( y.shape[0] ) 
         collision_id =np.where(  np.sum( abs(y_pred - y ), axis = 1) > 0)
-#        collision_id = np.array_equal(y_pred == y)
         y_binary[collision_id]= 1
-#        pdb.set_trace()
         return y_binary
 
 class SVM(Discriminator):
@@ -203,3 +198,97 @@ class VOTE(Discriminator):
                                                   ('mlp', clf5), ('svm', clf6), ('knn', clf7)], voting='soft')
         self.model.fit(X, y)
 
+class CNN():
+
+    def __init__(self, opt, sess):
+        self.opts = opt
+
+        self.sess = sess
+        self.images = tf.placeholder(tf.float32, \
+            [None,  self.opts.img_dim, self.opts.img_dim, self.opts.input_c_dim], name='image')
+
+        self.y_true = tf.placeholder(tf.float32, shape=[None, self.opts.label_dim], name='y_true')
+
+        y_true_cls = tf.argmax(self.y_true, dimension=1)
+
+        _, self.loss = self.create_network(training=True)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(self.loss)  
+        y_pred, _ = self.create_network(training=False)
+        y_pred_cls = tf.argmax(y_pred, dimension=1)
+        self.y_pred_cls = y_pred_cls
+        self.y_pred = y_pred
+        y_pred_cls = tf.argmax(y_pred, dimension=1)
+        correct_prediction = tf.equal(y_pred_cls, y_true_cls)
+        self.y_prediction = tf.not_equal(y_pred_cls, y_true_cls)
+        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+        net_vars = tf.get_collection(tf.GraphKeys.VARIABLES, scope='network')
+        self.saver = tf.train.Saver( net_vars, max_to_keep =1)
+        self.sess.run( tf.variables_initializer(net_vars) )
+        # self.sess.run(tf.global_variables_initializer())
+
+
+    def predict(self, data,  label):
+        feed = {self.images : data, self.y_true : label }
+        y_prediction = self.sess.run( self.y_prediction, feed)
+        return y_prediction
+
+    def create_network(self, training):
+        # Wrap the neural network in the scope named 'network'.
+        # Create new variables during training, and re-use during testing.
+        with tf.variable_scope('network', reuse=not training):
+            # Just rename the input placeholder variable for convenience.
+            # Create TensorFlow graph for the main processing.
+            y_pred, loss = self.main_network(images=self.images, training=training)
+
+        return y_pred, loss
+
+
+    def main_network(self, images, training):
+        # Wrap the input images as a Pretty Tensor object.
+        x_pretty = pt.wrap(images)
+
+        # Pretty Tensor uses special numbers to distinguish between
+        # the training and testing phases.
+        if training:
+            phase = pt.Phase.train
+        else:
+            phase = pt.Phase.infer
+
+        # Create the convolutional neural network using Pretty Tensor.
+        # It is very similar to the previous tutorials, except
+        # the use of so-called batch-normalization in the first layer.
+        with pt.defaults_scope(activation_fn=tf.nn.relu, phase=phase):
+            y_pred, loss = x_pretty.\
+                conv2d(kernel=5, depth=64, name='layer_conv1', batch_normalize=True).\
+                max_pool(kernel=2, stride=2).\
+                conv2d(kernel=5, depth=64, name='layer_conv2', batch_normalize=True).\
+                max_pool(kernel=2, stride=2).\
+                flatten().\
+                fully_connected(size=256, name='layer_fc1').\
+                fully_connected(size=128, name='layer_fc2').\
+                softmax_classifier(num_classes=self.opts.label_dim, labels=self.y_true)
+
+        return y_pred, loss
+
+    def load(self, checkpoint_path):
+        self.saver.restore(self.sess, checkpoint_path)
+    
+
+
+
+def setup(opt, sess):
+    model_path_name = "%s/%s_model.ckpt" %(opt.load_checkpoint_path, opt.model_name.lower()) 
+    # check compatibility if training is continued from previously saved model
+    print 'model path: ', model_path_name
+
+    if opt.model_name.upper() == 'MLP':
+        model = MLP()
+        model.load( model_path_name)
+        return model
+    elif opt.model_name.upper() == 'CNN':
+        model =  CNN(opt, sess)
+        model.load(model_path_name)
+        return model
+    else:
+        raise Exception("Caption model not supported: {}".format(opt.model_name))

@@ -13,6 +13,8 @@ import matplotlib.gridspec as gridspec
 # import os
 # from discriminator import RandomForrest
 from model import MLP
+from model import CNN
+import model as Blackbox
 import pdb
 import opts 
 from Dataset import Dataset
@@ -23,11 +25,8 @@ from utils import save_images
 # os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 def train():
+    flatten_flag = True ### the output of G need to flatten or not?
     opt = opts.parse_opt()
-    if not os.path.exists(opt.image_path):
-        os.mkdir(opt.image_path)
-    if not os.path.exists(opt.checkpoint_path):
-        os.mkdir(opt.checkpoint_path)
     if opt.input_data.upper() == "MNIST" :
         mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
         train_data =  mnist.train.images * 2.0 - 1.0
@@ -38,31 +37,48 @@ def train():
         test_label = mnist.test.labels
         test_loader = Dataset(test_data, test_label)
 
-    elif opt.input_data.upper() == "CIFAR":
+        x_dim = train_data.shape[1]
+        y_dim = train_label.shape[1]
+        
+        opt.input_c_dim = 1
+        opt.output_c_dim = 1
+        opt.input_dim = x_dim
+        opt.label_dim = y_dim
+
+    elif opt.input_data.upper() == "CIFAR10":
+        flatten_flag = False
         cifar10.maybe_download_and_extract()
         images_train, cls_train, labels_train = cifar10.load_training_data()
         images_test, cls_test, labels_test = cifar10.load_test_data()
+        assert( images_train.shape[1] == images_train.shape[2])
+        assert( len( images_train.shape) == 4)
         #maybe need mapping to -1-1
+        images_train = images_train * 2.0 - 1.0
+        images_test = images_test * 2.0 - 1.0
         loader = Dataset( images_train, labels_train)
         test_loader = Dataset( images_test, labels_test)
-    x_dim = train_data.shape[1]
-    y_dim = train_label.shape[1]
-    # pdb.set_trace()
-    batch_size = opt.batch_size
-    h_dim = opt.h_dim
+      
+        shapes = images_train.shape
+        opt.img_dim = shapes[1]
+        opt.input_c_dim = shapes[3]
+        opt.output_c_dim = shapes[3]
+        opt.label_dim = labels_train.shape[1]
+        opt.input_dim = shapes[1]
+        # opt.batch_size = 128
 
-    opt.input_c_dim = 1
-    opt.output_c_dim = 1
-    opt.input_dim = x_dim
-    opt.label_dim = y_dim
-    loader = Dataset(train_data, train_label)
+    #add prefix(dataset name) to the path 
+    opt.image_path = opt.input_data + '/' + opt.image_path
+    opt.checkpoint_path = opt.input_data + '/' +  opt.checkpoint_path
+    opt.load_checkpoint_path = opt.input_data + '/' + opt.load_checkpoint_path
+
+
+    if not os.path.exists(opt.image_path):
+        os.mkdir(opt.image_path)
+    if not os.path.exists(opt.checkpoint_path):
+        os.mkdir(opt.checkpoint_path)
+    batch_size = opt.batch_size
     fine_tune = opt.fine_tune
-    D = MLP(layers = (h_dim))
-    if fine_tune:
-        D.load( opt.load_checkpoint_path + "/mlp_model")
-    else:
-        D.train(train_data, train_label)
-        D.save( opt.checkpoint_path + "/mlp_model")
+
     NUM_THREADS = 2
     tf_config = tf.ConfigProto()
     tf_config.intra_op_parallelism_threads=NUM_THREADS
@@ -71,10 +87,10 @@ def train():
     with tf.Session(config=tf_config) as sess:
         # Initialize the variables, and restore the variables form checkpoint if there is.
         # and initialize the writer
+        model = EvaGAN(opt, sess)
+        D = Blackbox.setup(opt, sess)
 
-        model = EvaGAN(D, opt, sess)
         iteration = 0
-        print fine_tune
         if fine_tune:
             print "FINE-TUNE"
             iteration = opt.iteration
@@ -127,7 +143,10 @@ def train():
             else:#stage II add adversarial loss
                 data = loader.next_batch(batch_size, negative = True, priority = True) 
                 feed = { model.source : data[0]}
-                sample = sess.run(model.fake_images_sample_flatten, feed)
+                if flatten_flag:
+                    sample = sess.run(model.fake_images_sample_flatten, feed)
+                else:
+                    sample = sess.run(model.fake_images_sample, feed)
                 predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)
                 ###select success 
                 feed = {model.source :  data[0], \
@@ -151,13 +170,15 @@ def train():
             if iteration > opt.add_neg_iteration and iteration % opt.add_neg_every == 0:
                     
                 feed = {model.source : data[0]}
-                sample = sess.run(model.fake_images_sample_flatten, feed)
+                if flatten_flag:
+                    sample = sess.run(model.fake_images_sample_flatten, feed)
+                else:
+                    sample = sess.run(model.fake_images_sample, feed)
                 predict_labels = D.predict(sample, data[1]).reshape(batch_size, 1)
                 atr_idx = np.where(predict_labels == 1)[0]
                 # insert some negative samples
                 
                 magnitude = np.sum( abs( sample - data[0] ) ,axis = 1)
-#                pdb.set_trace()
                 loader.insert_negative_sample(sample[atr_idx, :],  data[1][atr_idx, :] , magnitude[atr_idx])
             # Update the iteration and epoch
             iteration += 1
@@ -174,8 +195,12 @@ def train():
                     s_imgs, s_label  = test_loader.next_batch(batch_size, negative = False)
             
                     feed = {model.source : s_imgs}
-                    samples = sess.run(model.fake_images_sample_flatten, feed)
-                    predict_label = D.predict( samples, s_label)
+                    if flatten_flag:
+                        sample = sess.run(model.fake_images_sample_flatten, feed)
+                    else:
+                        sample = sess.run(model.fake_images_sample, feed)
+                
+                    predict_label = D.predict( sample, s_label)
                     acc += float( np.sum(predict_label) ) 
                 print "total accuracy: ", acc / float(i * batch_size)
 

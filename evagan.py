@@ -11,18 +11,19 @@ class EvaGAN():
     """
     GAN for generating malware.
     """
-    def __init__(self,  D, opts, sess):
+    def __init__(self,  opts, sess):
         """
         :param D: the discriminator object
         :param params: the dict used to train the generative neural networks
         """
-        self.D = D
         self.opts = opts
 
         self._build_model()
         self.sess = sess
-        self.saver = tf.train.Saver(max_to_keep =100000)
-        self.sess.run(tf.global_variables_initializer())
+        net_vars = tf.get_collection(tf.GraphKeys.VARIABLES, scope = "evagan")
+        self.saver = tf.train.Saver(net_vars, max_to_keep =100000)
+        self.sess.run( tf.variables_initializer(net_vars) )
+        # self.sess.run(tf.global_variables_initializer())
         # self.sess.run(tf.local_variables_initializer())
         # self.sess.run(tf.initialize_all_variables())
     def load(self, checkpoint_path):
@@ -44,158 +45,185 @@ class EvaGAN():
         L1_lambda = self.opts.L1_lambda
         self.gf_dim = self.opts.gf_dim
         self.df_dim = self.opts.df_dim
-
+        with tf.variable_scope('evagan'):
         ###batch normalization
-        self.d_bn1 = batch_norm(name='d_bn1')
-        self.d_bn2 = batch_norm(name='d_bn2')
-        self.d_bn3 = batch_norm(name='d_bn3')
+            self.d_bn1 = batch_norm(name='d_bn1')
+            self.d_bn2 = batch_norm(name='d_bn2')
+            self.d_bn3 = batch_norm(name='d_bn3')
 
-        self.d2_bn1 = batch_norm(name='adv_bn1')
-        self.d2_bn2 = batch_norm(name='adv_bn2')
-        self.d2_bn3 = batch_norm(name='adv_bn3')
+            self.d2_bn1 = batch_norm(name='adv_bn1')
+            self.d2_bn2 = batch_norm(name='adv_bn2')
+            self.d2_bn3 = batch_norm(name='adv_bn3')
 
 
-        self.g_bn_e2 = batch_norm(name='g_bn_e2')
-        self.g_bn_e3 = batch_norm(name='g_bn_e3')
-        self.g_bn_e4 = batch_norm(name='g_bn_e4')
-        self.g_bn_e5 = batch_norm(name='g_bn_e5')
-       
-        self.g_bn_d1 = batch_norm(name='g_bn_d1')
-        self.g_bn_d2 = batch_norm(name='g_bn_d2')
-        self.g_bn_d3 = batch_norm(name='g_bn_d3')
-        self.g_bn_d4 = batch_norm(name='g_bn_d4')
+            self.g_bn_e2 = batch_norm(name='g_bn_e2')
+            self.g_bn_e3 = batch_norm(name='g_bn_e3')
+            self.g_bn_e4 = batch_norm(name='g_bn_e4')
+            self.g_bn_e5 = batch_norm(name='g_bn_e5')
+           
+            self.g_bn_d1 = batch_norm(name='g_bn_d1')
+            self.g_bn_d2 = batch_norm(name='g_bn_d2')
+            self.g_bn_d3 = batch_norm(name='g_bn_d3')
+            self.g_bn_d4 = batch_norm(name='g_bn_d4')
+            
+            self.lr = tf.Variable(0.001, trainable = False,  name = "learning_rate")
+
+            input_c_dim = self.opts.input_c_dim
+            self.output_c_dim = self.opts.output_c_dim
+            input_dim = self.opts.input_dim
+            label_dim = self.opts.label_dim
+            img_dim = self.opts.img_dim
+            self.batch_size = self.opts.batch_size
+            # the source image which we want to attack.
+            if self.opts.input_data.upper() == "MNIST" :
+                self.source = tf.placeholder(tf.float32, [None,  input_dim ],\
+                                        name='source_image')
+                # resize
+                self.image = tf.image.resize_bilinear(\
+                    tf.reshape( self.source, [-1, img_dim, img_dim, input_c_dim]), \
+                    [32, 32])
+                # the target images, which has the different label. We can also conduct target attack later
+                self.target = tf.placeholder(tf.float32, [None, input_dim],\
+                                        name='source_image')
+                self.real_image = tf.image.resize_bilinear(\
+                    tf.reshape( self.target, [-1, img_dim, img_dim, input_c_dim]), \
+                    [32, 32])   
+                ####for adversarial loss
+                self.negative_sample = tf.placeholder(tf.float32, [None, input_dim ], \
+                                        name = "negative_samples")
+                self.adv_image = tf.image.resize_bilinear(\
+                    tf.reshape( self.negative_sample, [-1, img_dim, img_dim, input_c_dim]), \
+                    [32, 32])   
+                
+                self.predict_labels = tf.placeholder(tf.float32, [None, 1], \
+                                        name = "predict_label")
+            else:
+                self.source = tf.placeholder(tf.float32, [None, img_dim, img_dim, input_c_dim], name = "source_image")
+                self.image = tf.image.resize_bilinear(\
+                    tf.reshape( self.source, [-1, img_dim, img_dim, input_c_dim]), \
+                    [32, 32])
+                # the target images, which has the different label. We can also conduct target attack later
+                self.target = tf.placeholder(tf.float32, [None, img_dim, img_dim, input_c_dim], name = "target_image")
+                self.real_image = tf.image.resize_bilinear(\
+                    tf.reshape( self.target, [-1, img_dim, img_dim, input_c_dim]), \
+                    [32, 32])   
+                ####for adversarial loss
+                self.negative_sample = tf.placeholder(tf.float32, [None, img_dim, img_dim, input_c_dim ], \
+                                        name = "negative_samples")
+                self.adv_image = tf.image.resize_bilinear(\
+                    tf.reshape( self.negative_sample, [-1, img_dim, img_dim, input_c_dim]), \
+                    [32, 32])   
+                
+                self.predict_labels = tf.placeholder(tf.float32, [None, 1],\
+                                        name = "predict_label")
+                ###modify here
+            
+
+            self.fake_images = self.generator(self.image)
+
+            D_fake_loss, D_fake_logit =  self.discriminator(tf.concat( [self.fake_images, self.image], axis = 3) )
+            D_real_loss, D_real_logit = self.discriminator(tf.concat( [self.real_image, self.image], axis = 3) , reuse = True)
+
+            D_fake_loss2, D_fake_logit2 = self.adv_discriminator(tf.concat( [self.fake_images, self.image], axis = 3))
+            D_real_loss2, D_real_logit2 = self.adv_discriminator(tf.concat( [self.adv_image, self.image], axis = 3), reuse = True) 
+
+
+            self.fake_images_sample = self.sampler(self.image)
+
+            self.fake_images_sample_flatten = tf.reshape( tf.image.resize_bilinear(\
+                self.fake_images_sample, [28, 28]), [-1, 28 * 28 ]  )
+
+            #go through a blackbox algorithm
+            # self.predict_labels = self.D.predict(self.adv_A, self.real_A_label)
+            # give the others 
+            ####
+            D_fake_loss = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_fake_logit, labels = tf.zeros_like(D_fake_logit)))    
+            D_real_loss = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_real_logit, labels = tf.ones_like(D_real_logit) ))
+
+            # D_fake_loss2 = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_fake_logit2, labels = tf.zeros_like(D_fake_logit2)))    
+            D_fake_loss2 = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_fake_logit2, labels = self.predict_labels))    
+
+            D_real_loss2 = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_real_logit2, labels = tf.ones_like(D_real_logit2)))
+
+
+
+            G_loss = tf.reduce_mean( \
+                tf.nn.sigmoid_cross_entropy_with_logits(\
+                    logits=D_fake_logit, \
+                    labels=tf.ones_like(D_fake_logit)\
+                    )\
+                )
+
+            adv_G_loss= tf.reduce_mean( \
+                tf.nn.sigmoid_cross_entropy_with_logits(\
+                    logits=D_fake_logit2, \
+                    labels=tf.ones_like(D_fake_logit2)\
+                    )\
+                )
+
+
+            ####
+          
+            self.G_loss = G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image) )
+            D_loss = D_real_loss + D_fake_loss
+            self.D_loss = D_loss
+
+            t_vars = tf.trainable_variables()
+
+            self.d_vars = [var for var in t_vars if 'd_' in var.name]
+            self.g_vars = [var for var in t_vars if 'g_' in var.name]
+         
+            self.adv_d_vars = [var for var in t_vars if 'adv_' in var.name]
+            
+            D_pre_opt = tf.train.AdamOptimizer(self.lr)
+            D_grads_and_vars_pre = D_pre_opt.compute_gradients(self.D_loss, self.d_vars)
+            D_grads_and_vars_pre = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in D_grads_and_vars_pre]
+            #grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
+            self.D_pre_train_op = D_pre_opt.apply_gradients(D_grads_and_vars_pre)
+
+
+            G_pre_opt = tf.train.AdamOptimizer(self.lr)
+            G_grads_and_vars_pre = G_pre_opt.compute_gradients(self.G_loss, self.g_vars)
+            #end 
+            G_grads_and_vars_pre = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in G_grads_and_vars_pre]
+            self.G_pre_train_op = G_pre_opt.apply_gradients(G_grads_and_vars_pre)
         
-        self.lr = tf.Variable(0.001, trainable = False,  name = "learning_rate")
-
-        input_c_dim = self.opts.input_c_dim
-        self.output_c_dim = self.opts.output_c_dim
-        input_dim = self.opts.input_dim
-        label_dim = self.opts.label_dim
-        img_dim = self.opts.img_dim
-        self.batch_size = self.opts.batch_size
-        # the source image which we want to attack.
-        self.source = tf.placeholder(tf.float32, [None,  input_dim ],\
-                                name='source_image')
-        # resize
-        self.image = tf.image.resize_bilinear(\
-            tf.reshape( self.source, [-1, img_dim, img_dim, input_c_dim]), \
-            [32, 32])
-        # the target images, which has the different label. We can also conduct target attack later
-        self.target = tf.placeholder(tf.float32, [None, input_dim],\
-                                name='source_image')
-        self.real_image = tf.image.resize_bilinear(\
-            tf.reshape( self.target, [-1, img_dim, img_dim, input_c_dim]), \
-            [32, 32])   
-        ####for adversarial loss
-        self.negative_sample = tf.placeholder(tf.float32, [None, input_dim ], \
-                                name = "negative_samples")
-        self.adv_image = tf.image.resize_bilinear(\
-            tf.reshape( self.negative_sample, [-1, img_dim, img_dim, input_c_dim]), \
-            [32, 32])   
-        
-        self.predict_labels = tf.placeholder(tf.float32, [None, 1], \
-                                name = "predict_label")
-        self.fake_images = self.generator(self.image)
 
 
-        D_fake_loss, D_fake_logit =  self.discriminator(tf.concat( [self.fake_images, self.image], axis = 3) )
-        D_real_loss, D_real_logit = self.discriminator(tf.concat( [self.real_image, self.image], axis = 3) , reuse = True)
+            #adversarial perturbation 
+            adv_D_loss = D_real_loss2 + D_fake_loss2
+            self.adv_G_loss = adv_G_loss
+            self.adv_D_loss = adv_D_loss
 
-        D_fake_loss2, D_fake_logit2 = self.adv_discriminator(tf.concat( [self.fake_images, self.image], axis = 3))
-        D_real_loss2, D_real_logit2 = self.adv_discriminator(tf.concat( [self.adv_image, self.image], axis = 3), reuse = True) 
+            # two models together 
+            self.G_loss2 = ld * G_loss + (1 - ld) * adv_G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image) )
+            self.D_loss2 = ld * D_loss  + (1 - ld) * adv_D_loss
 
 
-        self.fake_images_sample = self.sampler(self.image)
+            # self.G_loss2 = ld * self.G_loss + (1 - ld) * self.G_loss2
+            # self.D_loss2 = ld * ( self.D_loss ) + (1 - ld)*(self.D_loss2)
+            
+            # gradient clipping
+         
+            D_opt = tf.train.AdamOptimizer(self.lr)
+            D_grads_and_vars = D_opt.compute_gradients(self.D_loss2, self.adv_d_vars + self.d_vars)
+            D_grads_and_vars = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in D_grads_and_vars]
+            #grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
+            self.D_train_op = D_opt.apply_gradients(D_grads_and_vars)
 
-        self.fake_images_sample_flatten = tf.reshape( tf.image.resize_bilinear(\
-            self.fake_images_sample, [28, 28]), [-1, 28 * 28 ]  )
 
-        #go through a blackbox algorithm
-        # self.predict_labels = self.D.predict(self.adv_A, self.real_A_label)
-        # give the others 
-        ####
-        D_fake_loss = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_fake_logit, labels = tf.zeros_like(D_fake_logit)))    
-        D_real_loss = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_real_logit, labels = tf.ones_like(D_real_logit) ))
+            G_opt = tf.train.AdamOptimizer(self.lr)
 
-        # D_fake_loss2 = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_fake_logit2, labels = tf.zeros_like(D_fake_logit2)))    
-        D_fake_loss2 = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_fake_logit2, labels = self.predict_labels))    
-
-        D_real_loss2 = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = D_real_logit2, labels = tf.ones_like(D_real_logit2)))
+            G_grads_and_vars = G_opt.compute_gradients(self.G_loss2, self.g_vars)
+            # G_grads_and_vars = G_opt.compute_gradients(self.G_loss, G_Ws + G_bs)
+            # #end 
+            G_grads_and_vars = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in G_grads_and_vars]
+            self.G_train_op = G_opt.apply_gradients(G_grads_and_vars)
 
 
 
-        G_loss = tf.reduce_mean( \
-            tf.nn.sigmoid_cross_entropy_with_logits(\
-                logits=D_fake_logit, \
-                labels=tf.ones_like(D_fake_logit)\
-                )\
-            )
-
-        adv_G_loss= tf.reduce_mean( \
-            tf.nn.sigmoid_cross_entropy_with_logits(\
-                logits=D_fake_logit2, \
-                labels=tf.ones_like(D_fake_logit2)\
-                )\
-            )
-
-
-        ####
-      
-        self.G_loss = G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image) )
-        D_loss = D_real_loss + D_fake_loss
-        self.D_loss = D_loss
-
-        t_vars = tf.trainable_variables()
-
-        self.d_vars = [var for var in t_vars if 'd_' in var.name]
-        self.g_vars = [var for var in t_vars if 'g_' in var.name]
-     
-        self.adv_d_vars = [var for var in t_vars if 'adv_' in var.name]
-        
-        D_pre_opt = tf.train.AdamOptimizer(self.lr)
-        D_grads_and_vars_pre = D_pre_opt.compute_gradients(self.D_loss, self.d_vars)
-        D_grads_and_vars_pre = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in D_grads_and_vars_pre]
-        #grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
-        self.D_pre_train_op = D_pre_opt.apply_gradients(D_grads_and_vars_pre)
-
-
-        G_pre_opt = tf.train.AdamOptimizer(self.lr)
-        G_grads_and_vars_pre = G_pre_opt.compute_gradients(self.G_loss, self.g_vars)
-        #end 
-        G_grads_and_vars_pre = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in G_grads_and_vars_pre]
-        self.G_pre_train_op = G_pre_opt.apply_gradients(G_grads_and_vars_pre)
-    
-
-        #adversarial perturbation 
-        adv_D_loss = D_real_loss2 + D_fake_loss2
-        self.adv_G_loss = adv_G_loss
-        self.adv_D_loss = adv_D_loss
-
-   
-        self.G_loss2 = ld * G_loss + (1 - ld) * adv_G_loss + L1_lambda * tf.reduce_mean( tf.abs(self.fake_images - self.image) )
-        self.D_loss2 = ld * D_loss  + (1 - ld) * adv_D_loss
-
-
-        # self.G_loss2 = ld * self.G_loss + (1 - ld) * self.G_loss2
-        # self.D_loss2 = ld * ( self.D_loss ) + (1 - ld)*(self.D_loss2)
-        
-        # gradient clipping
-     
-        D_opt = tf.train.AdamOptimizer(self.lr)
-        D_grads_and_vars = D_opt.compute_gradients(self.D_loss2, self.adv_d_vars + self.d_vars)
-        D_grads_and_vars = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in D_grads_and_vars]
-        #grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), 1)
-        self.D_train_op = D_opt.apply_gradients(D_grads_and_vars)
-
-
-        G_opt = tf.train.AdamOptimizer(self.lr)
-
-        G_grads_and_vars = G_opt.compute_gradients(self.G_loss2, self.g_vars)
-        # G_grads_and_vars = G_opt.compute_gradients(self.G_loss, G_Ws + G_bs)
-        # #end 
-        G_grads_and_vars = [(tf.clip_by_value(gv[0], -1.0, 1.0), gv[1]) for gv in G_grads_and_vars]
-        self.G_train_op = G_opt.apply_gradients(G_grads_and_vars)
-        
+            self.D2_loss = D_fake_loss2
+            
         # #add new one 
 
 
@@ -217,7 +245,6 @@ class EvaGAN():
             h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
             # h2 is (32x 32 x self.df_dim*4)  4 x 4 x df_dim*4
             h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name='d_h3_conv')))
-            # pdb.set_trace()
             # h3 is (16 x 16 x self.df_dim*8) 4 x 4 x df_dim*8
             # h4 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd_h3_lin')
             h4 = linear(tf.reshape(h3, [-1, s8 * s8 * self.df_dim * 8]), 1, 'd_h3_lin')
@@ -299,6 +326,7 @@ class EvaGAN():
 
             self.d5, self.d5_w, self.d5_b = deconv2d(tf.nn.relu(d4),
                 [self.batch_size, s, s, self.output_c_dim], name='g_d5', with_w=True)
+
             return tf.nn.tanh(self.d5)
     
     def sampler(self, image, y=None):
